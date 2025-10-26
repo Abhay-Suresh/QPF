@@ -13,12 +13,13 @@ The goal is to find the lowest energy conformation of the protein, considering h
 This repository addresses the submission requirements as follows:
 
 1.  **Qiskit Code:**
-    * The complete, well-commented Qiskit-based pipeline is implemented across several Python modules (`.py` files) and driven by a Jupyter Notebook (`.ipynb`).
+    * The complete, well-commented Qiskit-based pipeline is implemented across several Python modules (`.py` files) and driven by a Jupyter Notebook (`quantum_protein_folding.ipynb`).
+    * A separate notebook (`choice.ipynb`) provides analysis justifying the design choices.
     * See the **Code Structure** section below for details on each file.
 
 2.  **Lattice Design Documentation:**
-    * **Choice:** The code supports Body-Centered Cubic (BCC), Face-Centered Cubic (FCC), and Cubic with Planar Diagonals (CPD) lattices, defined in `lattice.py`. BCC is used in the example notebook.
-    * **Advantages (Qubit Efficiency):** The encoding follows arXiv:2406.01547v1, using a turn-based representation.
+    * **Choice:** The code supports Body-Centered Cubic (BCC), Face-Centered Cubic (FCC), and Cubic with Planar Diagonals (CPD) lattices, defined in `lattice.py`. BCC is used in the example notebook, justified by the analysis in `choice.ipynb`.
+    * **Advantages (Qubit Efficiency):** The encoding follows arXiv:2406.01547v1, using a turn-based representation analyzed in `choice.ipynb`.
         * For FCC and CPD ("orthogonal" model), it uses 2 qubits for plane selection and log2(directions_per_plane) qubits for direction within the plane (`qubit_encoding.py`).
         * For BCC ("direct" model), it encodes the 8 neighbor directions directly using ceil(log2(8))=3 qubits per turn, eliminating plane selection qubits (`qubit_encoding.py`).
         * This turn-based encoding scales linearly with sequence length (N-1 turns) and logarithmically with the number of neighbors/directions, offering significant qubit savings compared to coordinate-based encodings for longer sequences.
@@ -33,6 +34,7 @@ This repository addresses the submission requirements as follows:
             * **Overlap Penalty:** Uses a *separate* penalty term `(D^2 - D_nn^2)^2` (where D_nn is the next-nearest neighbor distance) to strongly penalize configurations where residues occupy the same or too-close lattice sites.
             * **Invalid State Penalty:** Penalizes the '00' qubit state for plane selection in orthogonal models, which doesn't correspond to a valid plane.
     * The Mixer Hamiltonian ($H_M$) is the standard sum of single-qubit Pauli-X operators, also built in `hamiltonian.py`.
+    * The complexity comparison between lattices (in terms of Hamiltonian terms) is analyzed in `choice.ipynb`.
 
 4.  **Energy Landscape Analysis:**
     * The QAOA optimization progress (energy vs. iteration) is tracked during the optimization (`folding_qaoa.py`).
@@ -42,7 +44,7 @@ This repository addresses the submission requirements as follows:
 
 5.  **Performance Report:**
     * **Predicted vs. Expected:** The primary output is the most probable *valid* bitstring found after QAOA optimization. This bitstring is decoded into 3D coordinates (`results_interpreter.py`). While a specific "expected" structure isn't predefined for arbitrary sequences, the code validates the predicted structure for self-avoidance (no overlaps). The classical energy of the predicted structure can be computed for comparison (though the function `compute_classical_energy` is commented out in the notebook's final interpretation step, it is available in `results_interpreter.py`).
-    * **Quantum Resources:** The number of qubits required is determined by the sequence length and lattice type, calculated in `qubit_encoding.py` using the paper's efficient method. The circuit depth depends on the number of QAOA repetitions (`qaoa_reps`). The primary resource requirement is the number of qubits, which grows linearly with the number of turns (sequence length - 1).
+    * **Quantum Resources:** The number of qubits required is determined by the sequence length and lattice type, calculated in `qubit_encoding.py` using the paper's efficient method. The analysis in `choice.ipynb` demonstrates BCC's qubit efficiency (12 qubits for 5 residues) compared to other lattices (16-20 qubits) and coordinate encoding (>70 qubits). The circuit depth depends on the number of QAOA repetitions (`qaoa_reps`).
 
 6.  **3D Visualization:**
     * `results_interpreter.py` contains the `visualize_protein_fold` function, which uses Plotly to generate an interactive 3D plot of the predicted protein backbone on the chosen lattice structure. Hydrophobic/Polar residues are color-coded. An example plot is generated at the end of the `quantum_protein_folding.ipynb` notebook.
@@ -51,7 +53,8 @@ This repository addresses the submission requirements as follows:
 
 ## Code Structure
 
-* `quantum_protein_folding.ipynb`: Main Jupyter Notebook to configure and run the experiment.
+* `quantum_protein_folding.ipynb`: 🧪 Main Jupyter Notebook to configure and run the QAOA experiment.
+* `choice.ipynb`: 📊 Analysis notebook comparing encoding schemes and lattice choices, justifying the selection of Turn-Based Encoding and the BCC lattice based on qubit efficiency and Hamiltonian complexity.
 * `lattice.py`: Defines neighbor vectors for BCC, FCC, CPD, and SC lattices.
 * `hp.py`: Defines the Hydrophobic-Polar mapping for amino acids.
 * `mj.py`: Contains the Miyazawa-Jernigan contact potential matrix.
@@ -61,6 +64,7 @@ This repository addresses the submission requirements as follows:
 * `results_interpreter.py`: Decodes QAOA results, validates structures, analyzes energy convergence, computes classical energy, and generates plots (energy history, probability distribution, 3D fold).
 * `lattice_encoding.py`: (Helper) Functions to generate classical coordinate/turn-based encodings.
 * `reconstruct.py`: (Helper) Function to rebuild coordinates from a turn-based encoding.
+* `images/`: Directory containing plots generated by the notebooks.
 
 ---
 
@@ -68,21 +72,18 @@ This repository addresses the submission requirements as follows:
 
 1.  **Prerequisites:** Ensure you have Python 3 and pip installed. Install the required libraries:
     ```bash
-    pip install qiskit qiskit-aer numpy scipy matplotlib plotly
+    pip install qiskit qiskit-aer numpy scipy matplotlib plotly pandas seaborn
     ```
+    *(Note: `pandas` and `seaborn` are used by `choice.ipynb`)*.
 
-2.  **Configuration:** Open the `quantum_protein_folding.ipynb` notebook. Modify the parameters in the **"EXPERIMENT CONFIGURATION"** cell:
-    * `sequence`: Define the protein sequence using single-letter amino acid codes.
-    * `lattice_name` / `neighbors`: Choose the desired lattice (e.g., `BCC` / `bcc_neighbors`).
-    * `qaoa_reps`: Set the number of QAOA layers (p).
-    * `opt_maxiter`: Set the maximum iterations for the classical optimizer (COBYLA).
-    * `hamiltonian_params`: Adjust weights for HP interactions (`W_hh`), overlap penalty (`P_overlap`), etc.
+2.  **Run QAOA Experiment:**
+    * Open the `quantum_protein_folding.ipynb` notebook.
+    * Modify parameters in the **"EXPERIMENT CONFIGURATION"** cell (sequence, lattice, QAOA reps, etc.).
+    * Run the cells sequentially. This will perform the folding simulation and generate results, including plots in the `images/` directory.
 
-3.  **Execution:** Run the cells in the Jupyter Notebook sequentially from top to bottom. The notebook will:
-    * Load data and parameters.
-    * Construct the Hamiltonians.
-    * Run the QAOA optimization (this may take some time depending on parameters).
-    * Analyze the results, print the predicted structure, and display the energy plots and the final 3D visualization.
+3.  **Run Design Choice Analysis:**
+    * Open the `choice.ipynb` notebook.
+    * Run the cells sequentially. This notebook generates comparative plots (encoding efficiency, qubit cost per lattice, state space size, Hamiltonian terms) saved in the `images/` directory, along with a textual justification for choosing the Turn-Based Encoding on a BCC lattice.
 
 ---
 
